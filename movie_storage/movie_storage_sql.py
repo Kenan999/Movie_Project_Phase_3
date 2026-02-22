@@ -28,6 +28,7 @@ with engine.connect() as connection:
             year INTEGER NOT NULL,
             rating REAL NOT NULL,
             poster TEXT,
+            imdb_id TEXT,
             note TEXT DEFAULT '',
             user_id INTEGER NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(id)
@@ -101,6 +102,7 @@ def fetch_movie_from_api(title):
             "rating": float(data["imdbRating"])
             if data["imdbRating"] != "N/A" else 0.0,
             "poster": data["Poster"],
+            "imdb_id": data.get("imdbID", "")
         }
 
     except requests.RequestException as exc:
@@ -111,7 +113,7 @@ def list_movies():
     with engine.connect() as connection:
         result = connection.execute(
             text("""
-                SELECT title, year, rating, poster, note
+                SELECT title, year, rating, poster, imdb_id, note
                 FROM movies
                 WHERE user_id = :user_id
             """),
@@ -124,7 +126,8 @@ def list_movies():
             "year": row[1],
             "rating": row[2],
             "poster": row[3],
-            "note": row[4]
+            "imdb_id": row[4],
+            "note": row[5]
         }
         for row in rows
     }
@@ -143,14 +146,15 @@ def add_movie(title, note=""):
             connection.execute(
                 text("""
                     INSERT INTO movies
-                    (title, year, rating, poster, note, user_id)
-                    VALUES (:title, :year, :rating, :poster, :note, :user_id)
+                    (title, year, rating, poster, imdb_id, note, user_id)
+                    VALUES (:title, :year, :rating, :poster, :imdb_id, :note, :user_id)
                 """),
                 {
                     "title": movie["title"],
                     "year": movie["year"],
                     "rating": movie["rating"],
                     "poster": movie["poster"],
+                    "imdb_id": movie["imdb_id"],
                     "note": note.strip(),
                     "user_id": current_user_id,
                 }

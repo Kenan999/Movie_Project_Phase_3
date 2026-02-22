@@ -384,11 +384,16 @@ def generate_website_view():
             poster = data.get("poster", "")
             year = data["year"]
             rating = data["rating"]
+            imdb_id = data.get("imdb_id", "")
+
+            imdb_url = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "#"
 
             movie_html = f"""
             <li>
                 <div class="movie">
-                    <img class="movie-poster" src="{poster}" alt="{title}" title="{data.get('note','')}">
+                    <a href="{imdb_url}" target="_blank">
+                        <img class="movie-poster" src="{poster}" alt="{title}" title="{data.get('note','')}">
+                    </a>
                     <div class="movie-title">{title}</div>
                     <div class="movie-year">{year}</div>
                     <div class="movie-rating">Rating: {rating}</div>
