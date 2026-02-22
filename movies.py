@@ -18,7 +18,23 @@ SOFT_PINK = "\033[38;2;255;105;180m"
 
 CONTINUE_MESSAGE = "\nPress Enter to continue..."
 
+def require_logged_user():
+    """Prevent guest user from performing actions."""
+    active_user_id = storage.get_active_user()
+    if active_user_id is None:
+        print(f"{SOFT_RED}You must switch user before performing this action.{RESET}")
+        input(CONTINUE_MESSAGE)
+        return False
 
+    # Check if active user is guest
+    users = storage.get_users()
+    for user_id, name in users:
+        if user_id == active_user_id and name.lower() == "guest":
+            print(f"{SOFT_RED}Guest user cannot perform this action. Please switch user.{RESET}")
+            input(CONTINUE_MESSAGE)
+            return False
+
+    return True
 
 
 def get_valid_rating(prompt):
@@ -45,6 +61,8 @@ def get_valid_title(prompt):
 
 def get_movies_view():
     """Display all stored movies."""
+    if not require_logged_user():
+        return
     movies = storage.list_movies()
 
     if not movies:
@@ -62,6 +80,8 @@ def get_movies_view():
 
 def add_movie_view():
     """Prompt user for a movie title and add it via the storage layer."""
+    if not require_logged_user():
+        return
     title = input("\nEnter movie name: ").strip()
 
     if not title:
@@ -78,6 +98,8 @@ def add_movie_view():
 
 def delete_movie_view():
     """Delete a movie selected by the user."""
+    if not require_logged_user():
+        return
     movies = storage.list_movies()
 
     while True:
@@ -103,6 +125,8 @@ def delete_movie_view():
 
 def update_movie_view():
     """Update rating for a selected movie."""
+    if not require_logged_user():
+        return
     movies = storage.list_movies()
 
     while True:
@@ -122,15 +146,16 @@ def update_movie_view():
             f"Enter another name or press Enter to return.{RESET}"
         )
 
-    rating = get_valid_rating("Enter new rating (0–10): ")
-    storage.update_movie(title, rating)
-
-    print(f"{NUMBER_GREEN}Movie '{title}' updated successfully.{RESET}")
+    note = input("Enter movie note: ").strip()
+    storage.update_movie(title, note)
+    print(f"{NUMBER_GREEN}Movie '{title}' successfully updated.{RESET}")
     input(CONTINUE_MESSAGE)
 
 
 def states_view():
     """Display statistics such as average, median, best and worst movie."""
+    if not require_logged_user():
+        return
     movies = storage.list_movies()
 
     if not movies:
@@ -165,6 +190,8 @@ def states_view():
 
 def random_movie_view():
     """Display a randomly selected movie."""
+    if not require_logged_user():
+        return
     movies = storage.list_movies()
 
     if not movies:
@@ -181,6 +208,8 @@ def random_movie_view():
 
 def sorted_movies_view():
     """Display movies sorted by rating."""
+    if not require_logged_user():
+        return
     movies = storage.list_movies()
 
     sorted_items = sorted(movies.items(), key=lambda x: x[1]["rating"])
@@ -193,6 +222,8 @@ def sorted_movies_view():
 
 def chronological_movies_view():
     """Display movies sorted by year."""
+    if not require_logged_user():
+        return
     movies = storage.list_movies()
 
     while True:
@@ -217,6 +248,8 @@ def chronological_movies_view():
 
 def filter_movies_view():
     """Filter movies by rating and year range."""
+    if not require_logged_user():
+        return
     movies = storage.list_movies()
 
     min_rating_input = input(
@@ -277,6 +310,8 @@ def filter_movies_view():
 
 def search_movie_view():
     """Search movies by title using exact, prefix, and fuzzy matching."""
+    if not require_logged_user():
+        return
     movies = storage.list_movies()
 
     query = input("\nEnter movie name to search: ").strip().lower()
@@ -303,6 +338,8 @@ def search_movie_view():
 
 def rating_histogram_view():
     """Generate and save a histogram of movie ratings."""
+    if not require_logged_user():
+        return
     movies = storage.list_movies()
     ratings = [m["rating"] for m in movies.values()]
 
@@ -322,6 +359,8 @@ def rating_histogram_view():
 
 def generate_website_view():
     """Generate static HTML website from template."""
+    if not require_logged_user():
+        return
     movies = storage.list_movies()
 
     # Read template
@@ -348,7 +387,7 @@ def generate_website_view():
             movie_html = f"""
             <li>
                 <div class="movie">
-                    <img class="movie-poster" src="{poster}" alt="{title}">
+                    <img class="movie-poster" src="{poster}" alt="{title}" title="{data.get('note','')}">
                     <div class="movie-title">{title}</div>
                     <div class="movie-year">{year}</div>
                 </div>
@@ -370,6 +409,57 @@ def generate_website_view():
         file.write(final_html)
 
     print("Website was generated successfully.")
+    input(CONTINUE_MESSAGE)
+
+def switch_user_view():
+    """Allow user to select or create profile."""
+    users = storage.get_users()
+
+    print("\nSelect a user:")
+    for idx, (user_id, name) in enumerate(users, start=1):
+        print(f"{idx}. {name}")
+    print(f"{len(users) + 1}. Create new user")
+
+    choice = input("Enter choice: ").strip()
+
+    if not choice.isdigit():
+        return
+
+    choice = int(choice)
+
+    if 1 <= choice <= len(users):
+        user_id, name = users[choice - 1]
+        storage.set_active_user(user_id)
+        print(f"\nWelcome back, {name}! 🎬")
+    elif choice == len(users) + 1:
+        name = input("Enter new user name: ").strip()
+        if not name:
+            return
+
+        result = storage.create_user(name)
+
+        # Duplicate username case
+        if result == "Username already exists. Try another one.":
+            print(f"\n{SOFT_RED}{result}{RESET}")
+            input(CONTINUE_MESSAGE)
+            return
+
+        # Invalid username case
+        if result == "Invalid username.":
+            print(f"\n{SOFT_RED}{result}{RESET}")
+            input(CONTINUE_MESSAGE)
+            return
+
+        # Success case
+        normalized = name.strip().capitalize()
+        users = storage.get_users()
+        for user_id, uname in users:
+            if uname == normalized:
+                storage.set_active_user(user_id)
+                break
+
+        print(f"\n{NUMBER_GREEN}User '{normalized}' created and logged in!{RESET}")
+
     input(CONTINUE_MESSAGE)
 
 def exit_view():
@@ -394,6 +484,7 @@ view = {
     10: {"view_name": "MoviesChronological", "body": chronological_movies_view},
     11: {"view_name": "FilterMovies", "body": filter_movies_view},
     12: {"view_name": "GenerateWebsite", "body": generate_website_view},
+    13: {"view_name": "SwitchUser", "body": switch_user_view},
 }
 
 
@@ -415,7 +506,31 @@ def main():
     ]
 
     while True:
-        choice = input("Enter choice: ").strip()
+        # Show active username in prompt
+        active_user_id = storage.get_active_user()
+        username = "guest"
+
+        if active_user_id is not None:
+            users = storage.get_users()
+            for user_id, name in users:
+                if user_id == active_user_id:
+                    username = name
+                    break
+
+        # Username color logic
+        if username.lower() == "guest":
+            user_color = SOFT_RED
+        else:
+            user_color = NUMBER_GREEN
+
+        RARE_AT = "\033[38;2;0;255;200m"  # Rare neon turquoise
+
+        prompt = (
+            f"{user_color}{username}{RESET}"
+            f"{RARE_AT}@{RESET}"
+            f"{SOFT_YELLOW} Enter choice:{RESET} "
+        )
+        choice = input(prompt).strip()
 
         if not choice:
             color = rotating_colors[

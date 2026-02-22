@@ -1,44 +1,91 @@
 """SQL storage layer for the Movies project using OMDb API and SQLite."""
 
 import os
-
 import requests
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 
-# Define the database URL
+# Database
 DB_URL = "sqlite:///data/movies.db"
+os.makedirs("data", exist_ok=True)
+engine = create_engine(DB_URL, echo=False)
 
-# Create the engine; log statements only if the database doesn't exist yet
-db_exists = os.path.exists("data/movies.db")
-engine = create_engine(DB_URL, echo=not db_exists)
-
-# Create the movies table if it does not exist
 with engine.connect() as connection:
+    connection.execute(text("PRAGMA foreign_keys = ON;"))
+
+    connection.execute(text("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """))
+
     connection.execute(text("""
         CREATE TABLE IF NOT EXISTS movies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT UNIQUE NOT NULL,
+            title TEXT NOT NULL,
             year INTEGER NOT NULL,
             rating REAL NOT NULL,
-            poster TEXT
+            poster TEXT,
+            note TEXT DEFAULT '',
+            user_id INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+                ON DELETE CASCADE,
+            UNIQUE(title, user_id)
         )
     """))
+
     connection.commit()
 
 load_dotenv()
-
 API_KEY = os.getenv("API_KEY")
 OMDB_URL = "http://www.omdbapi.com/"
 
+current_user_id = None
+
+
+# ---------------- USERS ---------------- #
+
+def get_users():
+    with engine.connect() as connection:
+        result = connection.execute(
+            text("SELECT id, name FROM users ORDER BY name")
+        )
+        return result.fetchall()
+
+
+def create_user(name):
+    if not name:
+        return "Invalid username."
+
+    normalized = name.strip().capitalize()
+
+    with engine.connect() as connection:
+        try:
+            connection.execute(
+                text("INSERT INTO users (name) VALUES (:name)"),
+                {"name": normalized}
+            )
+            connection.commit()
+            return "User created successfully."
+        except IntegrityError:
+            return "Username already exists. Try another one."
+
+
+def set_active_user(user_id):
+    global current_user_id
+    current_user_id = user_id
+
+
+def get_active_user():
+    return current_user_id
+
+
+# ---------------- MOVIES ---------------- #
+
 def fetch_movie_from_api(title):
-    """Fetch movie data from OMDb API."""
-    params = {
-        "apikey": API_KEY,
-        "t": title,
-        "r": "json"
-    }
+    params = {"apikey": API_KEY, "t": title, "r": "json"}
 
     try:
         response = requests.get(OMDB_URL, params=params, timeout=5)
@@ -51,8 +98,9 @@ def fetch_movie_from_api(title):
         return {
             "title": data["Title"],
             "year": int(data["Year"]),
-            "rating": float(data["imdbRating"]) if data["imdbRating"] != "N/A" else 0.0,
-            "poster": data["Poster"]
+            "rating": float(data["imdbRating"])
+            if data["imdbRating"] != "N/A" else 0.0,
+            "poster": data["Poster"],
         }
 
     except requests.RequestException as exc:
@@ -60,48 +108,52 @@ def fetch_movie_from_api(title):
 
 
 def list_movies():
-    """Retrieve all movies from the database."""
     with engine.connect() as connection:
         result = connection.execute(
-            text("SELECT title, year, rating, poster FROM movies")
+            text("""
+                SELECT title, year, rating, poster, note
+                FROM movies
+                WHERE user_id = :user_id
+            """),
+            {"user_id": current_user_id}
         )
-        movies = result.fetchall()
+        rows = result.fetchall()
 
     return {
         row[0]: {
             "year": row[1],
             "rating": row[2],
-            "poster": row[3]
+            "poster": row[3],
+            "note": row[4]
         }
-        for row in movies
+        for row in rows
     }
 
 
-def add_movie(title):
-    """Add movie from OMDb API into database with strict validation."""
-
-    # Reject empty or very short titles
+def add_movie(title, note=""):
     if not title or len(title.strip()) < 3:
         return "Movie not found."
 
     movie = fetch_movie_from_api(title.strip())
-
-    # If API returned nothing
     if movie is None:
-        return "Movie not found."
-
-    # Enforce exact title match (case-insensitive)
-    if movie["title"].strip().lower() != title.strip().lower():
         return "Movie not found."
 
     with engine.connect() as connection:
         try:
             connection.execute(
                 text("""
-                    INSERT INTO movies (title, year, rating, poster)
-                    VALUES (:title, :year, :rating, :poster)
+                    INSERT INTO movies
+                    (title, year, rating, poster, note, user_id)
+                    VALUES (:title, :year, :rating, :poster, :note, :user_id)
                 """),
-                movie
+                {
+                    "title": movie["title"],
+                    "year": movie["year"],
+                    "rating": movie["rating"],
+                    "poster": movie["poster"],
+                    "note": note.strip(),
+                    "user_id": current_user_id,
+                }
             )
             connection.commit()
             return "Movie added successfully."
@@ -110,22 +162,28 @@ def add_movie(title):
 
 
 def delete_movie(title):
-    """Delete a movie by title from the database."""
     with engine.connect() as connection:
         result = connection.execute(
-            text("DELETE FROM movies WHERE title = :title"),
-            {"title": title}
+            text("""
+                DELETE FROM movies
+                WHERE title = :title AND user_id = :user_id
+            """),
+            {"title": title, "user_id": current_user_id}
         )
         connection.commit()
         return result.rowcount > 0
 
 
-def update_movie(title, rating):
-    """Update a movie's rating in the database."""
+def update_movie(title, note):
     with engine.connect() as connection:
         result = connection.execute(
-            text("UPDATE movies SET rating = :rating WHERE title = :title"),
-            {"rating": rating, "title": title}
+            text("""
+                UPDATE movies
+                SET note = :note
+                WHERE title = :title AND user_id = :user_id
+            """),
+            {"note": note, "title": title,
+             "user_id": current_user_id}
         )
         connection.commit()
         return result.rowcount > 0
