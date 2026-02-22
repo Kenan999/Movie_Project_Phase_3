@@ -386,7 +386,29 @@ def generate_website_view():
             rating = data["rating"]
             imdb_id = data.get("imdb_id", "")
 
-            imdb_url = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "#"
+            # Extract first country
+            country_raw = data.get("country", "")
+            first_country = country_raw.split(",")[0].strip()
+
+            # Dynamic ISO lookup using pycountry
+            try:
+                import pycountry
+                country_obj = pycountry.countries.search_fuzzy(first_country)[0]
+                iso_code = country_obj.alpha_2
+            except Exception:
+                iso_code = None
+
+            def iso_to_flag(code):
+                if not code:
+                    return ""
+                return chr(ord(code[0]) + 127397) + chr(ord(code[1]) + 127397)
+
+            flag = iso_to_flag(iso_code)
+
+            imdb_url = (
+                f"https://www.imdb.com/title/{imdb_id}/"
+                if imdb_id else "#"
+            )
 
             movie_html = f"""
             <li>
@@ -394,7 +416,7 @@ def generate_website_view():
                     <a href="{imdb_url}" target="_blank">
                         <img class="movie-poster" src="{poster}" alt="{title}" title="{data.get('note','')}">
                     </a>
-                    <div class="movie-title">{title}</div>
+                    <div class="movie-title">{flag} {title}</div>
                     <div class="movie-year">{year}</div>
                     <div class="movie-rating">Rating: {rating}</div>
                 </div>
