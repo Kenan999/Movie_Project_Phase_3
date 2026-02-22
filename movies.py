@@ -383,6 +383,7 @@ def generate_website_view():
         for title, data in movies.items():
             poster = data.get("poster", "")
             year = data["year"]
+            rating = data["rating"]
 
             movie_html = f"""
             <li>
@@ -390,6 +391,7 @@ def generate_website_view():
                     <img class="movie-poster" src="{poster}" alt="{title}" title="{data.get('note','')}">
                     <div class="movie-title">{title}</div>
                     <div class="movie-year">{year}</div>
+                    <div class="movie-rating">Rating: {rating}</div>
                 </div>
             </li>
             """
