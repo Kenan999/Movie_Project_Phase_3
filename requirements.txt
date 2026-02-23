@@ -3,3 +3,4 @@ requests
 python-dotenv
 sqlalchemy
 matplotlib
+pycountry
