@@ -1,8 +1,13 @@
 """Command-line interface for managing a movie database using a SQL storage layer."""
 import sys
 import random
+import os
 from difflib import get_close_matches
+
 import matplotlib.pyplot as plt
+import pycountry
+from dotenv import load_dotenv
+
 from movie_storage import movie_storage_sql as storage
 
 
@@ -15,6 +20,8 @@ SOFT_PURPLE = "\033[38;2;186;85;211m"
 SOFT_ORANGE = "\033[38;2;255;140;0m"
 SOFT_CYAN = "\033[38;2;0;206;209m"
 SOFT_PINK = "\033[38;2;255;105;180m"
+
+rare_at = "\033[38;2;0;255;200m"
 
 CONTINUE_MESSAGE = "\nPress Enter to continue..."
 
@@ -395,11 +402,9 @@ def generate_website_view():
 
             # Dynamic ISO lookup using pycountry
             try:
-                import pycountry
-                country_obj = pycountry.countries.search_fuzzy(first_country)[
-                    0]
+                country_obj = pycountry.countries.search_fuzzy(first_country)[0]
                 iso_code = country_obj.alpha_2
-            except Exception:
+            except (LookupError, IndexError):
                 iso_code = None
 
             def iso_to_flag(code):
@@ -459,8 +464,6 @@ def generate_website_view():
     movie_grid = "\n".join(movie_grid_parts)
 
     # Replace placeholders
-    import os
-    from dotenv import load_dotenv
     load_dotenv()
     api_key = os.getenv("API_KEY", "")
 
@@ -591,11 +594,9 @@ def main():
         else:
             user_color = NUMBER_GREEN
 
-        RARE_AT = "\033[38;2;0;255;200m"  # Rare neon turquoise
-
         prompt = (
             f"{user_color}{username}{RESET}"
-            f"{RARE_AT}@{RESET}"
+            f"{rare_at}@{RESET}"
             f"{SOFT_YELLOW} Enter choice:{RESET} "
         )
         choice = input(prompt).strip()

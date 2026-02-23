@@ -11,17 +11,17 @@ DB_URL = "sqlite:///data/movies.db"
 os.makedirs("data", exist_ok=True)
 engine = create_engine(DB_URL, echo=False)
 
-with engine.connect() as connection:
-    connection.execute(text("PRAGMA foreign_keys = ON;"))
+with engine.connect() as init_conn:
+    init_conn.execute(text("PRAGMA foreign_keys = ON;"))
 
-    connection.execute(text("""
+    init_conn.execute(text("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL
         )
     """))
 
-    connection.execute(text("""
+    init_conn.execute(text("""
         CREATE TABLE IF NOT EXISTS movies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -40,61 +40,66 @@ with engine.connect() as connection:
     """))
 
     # Add genre column to existing DB if missing
-    columns = connection.execute(text("PRAGMA table_info(movies)")).fetchall()
+    columns = init_conn.execute(text("PRAGMA table_info(movies)")).fetchall()
     column_names = [col[1] for col in columns]
     if "genre" not in column_names:
-        connection.execute(
+        init_conn.execute(
             text("ALTER TABLE movies ADD COLUMN genre TEXT DEFAULT ''"))
 
-    connection.commit()
+    init_conn.commit()
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
 OMDB_URL = "http://www.omdbapi.com/"
 
-current_user_id = None
+_current_user_id = None
 
 
 # ---------------- USERS ---------------- #
 
 def get_users():
-    with engine.connect() as connection:
-        result = connection.execute(
+    """Return all users ordered by name."""
+    with engine.connect() as conn:
+        result = conn.execute(
             text("SELECT id, name FROM users ORDER BY name")
         )
         return result.fetchall()
 
 
 def create_user(name):
+    """Create a new user if it does not already exist."""
     if not name:
         return "Invalid username."
 
     normalized = name.strip().capitalize()
 
-    with engine.connect() as connection:
+    with engine.connect() as conn:
         try:
-            connection.execute(
+            conn.execute(
                 text("INSERT INTO users (name) VALUES (:name)"),
                 {"name": normalized}
             )
-            connection.commit()
+            conn.commit()
             return "User created successfully."
         except IntegrityError:
             return "Username already exists. Try another one."
 
 
 def set_active_user(user_id):
-    global current_user_id
-    current_user_id = user_id
+    """Set the currently active user ID."""
+    global _current_user_id  # pylint: disable=global-statement
+    _current_user_id = user_id
 
 
 def get_active_user():
-    return current_user_id
+    """Return the currently active user ID."""
+    return _current_user_id
 
 
 # ---------------- MOVIES ---------------- #
 
 def fetch_movie_from_api(title):
+    """Fetch movie metadata from OMDb API."""
     params = {"apikey": API_KEY, "t": title, "r": "json"}
 
     try:
@@ -121,14 +126,15 @@ def fetch_movie_from_api(title):
 
 
 def list_movies():
-    with engine.connect() as connection:
-        result = connection.execute(
+    """Return all movies belonging to the active user."""
+    with engine.connect() as conn:
+        result = conn.execute(
             text("""
                 SELECT title, year, rating, poster, imdb_id, country, note, genre
                 FROM movies
                 WHERE user_id = :user_id
             """),
-            {"user_id": current_user_id}
+            {"user_id": _current_user_id}
         )
         rows = result.fetchall()
 
@@ -147,6 +153,7 @@ def list_movies():
 
 
 def add_movie(title, note=""):
+    """Add a movie to the active user's collection."""
     if not title or len(title.strip()) < 3:
         return "Movie not found."
 
@@ -154,9 +161,9 @@ def add_movie(title, note=""):
     if movie is None:
         return "Movie not found."
 
-    with engine.connect() as connection:
+    with engine.connect() as conn:
         try:
-            connection.execute(
+            conn.execute(
                 text("""
                     INSERT INTO movies
                     (title, year, rating, poster, imdb_id, country, note, genre, user_id)
@@ -171,38 +178,40 @@ def add_movie(title, note=""):
                     "country": movie["country"],
                     "note": note.strip(),
                     "genre": movie.get("genre", ""),
-                    "user_id": current_user_id,
+                    "user_id": _current_user_id,
                 }
             )
-            connection.commit()
+            conn.commit()
             return "Movie added successfully."
         except IntegrityError:
             return "Movie already exists."
 
 
 def delete_movie(title):
-    with engine.connect() as connection:
-        result = connection.execute(
+    """Delete a movie from the active user's collection."""
+    with engine.connect() as conn:
+        result = conn.execute(
             text("""
                 DELETE FROM movies
                 WHERE title = :title AND user_id = :user_id
             """),
-            {"title": title, "user_id": current_user_id}
+            {"title": title, "user_id": _current_user_id}
         )
-        connection.commit()
+        conn.commit()
         return result.rowcount > 0
 
 
 def update_movie(title, note):
-    with engine.connect() as connection:
-        result = connection.execute(
+    """Update the note of a movie for the active user."""
+    with engine.connect() as conn:
+        result = conn.execute(
             text("""
                 UPDATE movies
                 SET note = :note
                 WHERE title = :title AND user_id = :user_id
             """),
             {"note": note, "title": title,
-             "user_id": current_user_id}
+             "user_id": _current_user_id}
         )
-        connection.commit()
+        conn.commit()
         return result.rowcount > 0
