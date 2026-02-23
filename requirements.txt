@@ -2,3 +2,4 @@ matplotlib
 requests
 python-dotenv
 sqlalchemy
+matplotlib

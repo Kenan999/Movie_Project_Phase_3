@@ -3,22 +3,161 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>__TEMPLATE_TITLE__</title>
+    <!-- FontAwesome for stars and icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
+    <div class="sticky-container">
+        <header class="list-movies-title">
+            <div class="header-left"></div>
+            <div class="header-center">
+                <h1>__TEMPLATE_TITLE__</h1>
+            </div>
+            <div class="header-right">
+                <select id="language-switcher" class="language-switcher" aria-label="Select Language">
+                    <option value="en">🇬🇧 English</option>
+                    <option value="es">🇪🇸 Español</option>
+                    <option value="fr">🇫🇷 Français</option>
+                    <option value="de">🇩🇪 Deutsch</option>
+                </select>
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle Dark Mode">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </header>
 
-    <div class="list-movies-title">
-        <h1>__TEMPLATE_TITLE__</h1>
+        <section class="filters">
+            <div class="filter-group hide-on-empty">
+                <input type="text" id="search-input" placeholder="Search movies...">
+            </div>
+
+            <div class="filter-group hide-on-empty custom-select">
+                <select id="decade-filter">
+                    <option value="all">All Decades</option>
+                    <!-- populated by JS -->
+                </select>
+            </div>
+            <div class="filter-group hide-on-empty custom-select">
+                <select id="country-filter">
+                    <option value="all">All Countries</option>
+                    <!-- populated by JS -->
+                </select>
+            </div>
+            <div class="filter-group hide-on-empty custom-select">
+                <select id="sort-filter">
+                    <option value="default">Sort By: Default</option>
+                    <option value="title-asc">Title (A-Z)</option>
+                    <option value="title-desc">Title (Z-A)</option>
+                    <option value="rating-desc">Rating (High-Low)</option>
+                    <option value="rating-asc">Rating (Low-High)</option>
+                    <option value="year-desc">Year (Newest)</option>
+                    <option value="year-asc">Year (Oldest)</option>
+                </select>
+            </div>
+            <div class="filter-group hide-on-empty checkbox-group">
+                <label class="favorites-toggle">
+                    <input type="checkbox" id="favorites-only"> <i class="fa-solid fa-heart"></i> Favorites
+                </label>
+            </div>
+            <div class="filter-group hide-on-empty">
+                <button id="random-btn" class="random-btn"><i class="fa-solid fa-dice"></i> Random</button>
+            </div>
+        </section>
     </div>
 
-    <div>
-        <ol class="movie-grid">
-            __TEMPLATE_MOVIE_GRID__
-        </ol>
+    <div class="main-layout">
+        <main class="grid-container">
+            <ol class="movie-grid" id="movie-grid">
+                __TEMPLATE_MOVIE_GRID__
+            </ol>
+            <div class="load-more-container" id="load-more-container"
+                style="display: none; text-align: center; margin-bottom: 30px;">
+                <button id="load-more-btn" class="load-more-btn">Load More</button>
+            </div>
+
+            <!-- Hidden Modal -->
+            <div id="movie-modal" class="modal">
+                <div class="modal-content">
+                    <span class="close-btn" id="modal-close">&times;</span>
+                    <div class="modal-body">
+                        <img id="modal-poster" src="" alt="Poster" class="modal-poster skeleton">
+                        <div class="modal-info">
+                            <h2 id="modal-title"></h2>
+                            <div class="modal-meta">
+                                <span id="modal-year"></span> | <span id="modal-rating"></span> | <span
+                                    id="modal-country"></span>
+                            </div>
+                            <div id="modal-genres" class="movie-genres"></div>
+                            <p id="modal-note"></p>
+                            <a id="modal-imdb" href="#" target="_blank" class="imdb-btn">View on IMDb</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Side Information Panel -->
+        <aside id="hover-panel" class="hover-panel">
+            <div id="hp-bg" class="hover-panel-bg"></div>
+            <div class="hover-panel-fg">
+                <div class="hp-media-container" id="hp-media-container">
+                    <img id="hp-poster" src="" alt="Movie Poster" />
+                    <div class="play-button-overlay">
+                        <i class="fa-regular fa-circle-play"></i>
+                    </div>
+                </div>
+                <div class="hp-header">
+                    <h2 id="hp-title">---</h2>
+                    <div class="hp-meta">
+                        <span id="hp-year">---</span> &bull; <span id="hp-rating">---</span> <i class="fa-solid fa-star"
+                            style="color:var(--star-color);"></i>
+                    </div>
+                </div>
+                <div id="hp-omdb-info" class="hp-omdb-info skeleton-text-container">
+                    <div class="hp-extra-meta">
+                        <span id="hp-genre" class="hp-genre-meta">---</span>
+                        <span id="hp-runtime" class="hp-runtime-meta">---</span>
+                    </div>
+
+                    <!-- Fetched from OMDB live -->
+                    <div class="hp-label">Plot</div>
+                    <p id="hp-plot"></p>
+
+                    <div class="hp-grid-info">
+                        <div>
+                            <div class="hp-label">Director</div>
+                            <p id="hp-director"></p>
+                        </div>
+                        <div>
+                            <div class="hp-label">Actors</div>
+                            <p id="hp-actors"></p>
+                        </div>
+                        <div>
+                            <div class="hp-label">Released</div>
+                            <p id="hp-released"></p>
+                        </div>
+                        <div>
+                            <div class="hp-label">Box Office</div>
+                            <p id="hp-boxoffice"></p>
+                        </div>
+                    </div>
+
+                    <div class="hp-label">Awards</div>
+                    <p id="hp-awards"></p>
+                </div>
+            </div>
+    </div>
+    </aside>
     </div>
 
+    <script>
+        const OMDB_API_KEY = "__OMDB_API_KEY__";
+    </script>
+    <script src="script.js"></script>
 </body>
 
 </html>

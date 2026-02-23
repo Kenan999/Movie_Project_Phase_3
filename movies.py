@@ -18,6 +18,7 @@ SOFT_PINK = "\033[38;2;255;105;180m"
 
 CONTINUE_MESSAGE = "\nPress Enter to continue..."
 
+
 def require_logged_user():
     """Prevent guest user from performing actions."""
     active_user_id = storage.get_active_user()
@@ -30,7 +31,8 @@ def require_logged_user():
     users = storage.get_users()
     for user_id, name in users:
         if user_id == active_user_id and name.lower() == "guest":
-            print(f"{SOFT_RED}Guest user cannot perform this action. Please switch user.{RESET}")
+            print(
+                f"{SOFT_RED}Guest user cannot perform this action. Please switch user.{RESET}")
             input(CONTINUE_MESSAGE)
             return False
 
@@ -70,13 +72,14 @@ def get_movies_view():
         input(CONTINUE_MESSAGE)
         return
 
-    print()  
+    print()
 
     for title in sorted(movies):
         data = movies[title]
         print(f"{title}: {data['rating']} ({data['year']})")
 
     input(CONTINUE_MESSAGE)
+
 
 def add_movie_view():
     """Prompt user for a movie title and add it via the storage layer."""
@@ -95,6 +98,7 @@ def add_movie_view():
         print(e)
 
     input(CONTINUE_MESSAGE)
+
 
 def delete_movie_view():
     """Delete a movie selected by the user."""
@@ -356,7 +360,6 @@ def rating_histogram_view():
     input(CONTINUE_MESSAGE)
 
 
-
 def generate_website_view():
     """Generate static HTML website from template."""
     if not require_logged_user():
@@ -393,7 +396,8 @@ def generate_website_view():
             # Dynamic ISO lookup using pycountry
             try:
                 import pycountry
-                country_obj = pycountry.countries.search_fuzzy(first_country)[0]
+                country_obj = pycountry.countries.search_fuzzy(first_country)[
+                    0]
                 iso_code = country_obj.alpha_2
             except Exception:
                 iso_code = None
@@ -405,20 +409,48 @@ def generate_website_view():
 
             flag = iso_to_flag(iso_code)
 
-            imdb_url = (
-                f"https://www.imdb.com/title/{imdb_id}/"
-                if imdb_id else "#"
-            )
+            # Calculate exact percentage for precision stars
+            try:
+                numeric_rating = float(rating)
+            except ValueError:
+                numeric_rating = 0.0
+
+            fill_percentage = min(max(numeric_rating * 10, 0), 100)
+
+            stars_html = f'''
+            <div class="stars-outer" title="{rating} / 10">
+                <i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i>
+                <div class="stars-inner" style="width: {fill_percentage}%;">
+                    <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+                </div>
+            </div>
+            '''
+
+            safe_country = country_raw.replace('"', '&quot;')
+            safe_title = title.replace('"', '&quot;')
+
+            genre = data.get("genre", "")
+            safe_genre = genre.replace('"', '&quot;')
+            safe_note = data.get("note", "").replace('"', '&quot;')
+
+            genres = [g.strip() for g in genre.split(",") if g.strip()]
+            genre_html = "".join(
+                [f'<span class="genre-tag">{g}</span>' for g in genres])
 
             movie_html = f"""
-            <li>
+            <li data-title="{safe_title}" data-rating="{rating}" data-year="{year}" data-country="{safe_country}" data-imdbid="{imdb_id}" data-genre="{safe_genre}" data-note="{safe_note}">
                 <div class="movie">
-                    <a href="{imdb_url}" target="_blank">
-                        <img class="movie-poster" src="{poster}" alt="{title}" title="{data.get('note','')}">
+                    <i class="fa-solid fa-heart favorite-btn" title="Toggle Favorite" aria-label="Favorite"></i>
+                    <a href="#" class="movie-poster-link">
+                        <img class="movie-poster skeleton" src="{poster}" alt="{safe_title}">
+                        <div class="movie-hover-overlay">
+                            <p class="movie-hover-note">{safe_note or 'Click for more details'}</p>
+                        </div>
                     </a>
                     <div class="movie-title">{flag} {title}</div>
                     <div class="movie-year">{year}</div>
-                    <div class="movie-rating">Rating: {rating}</div>
+                    <div class="movie-rating" title="Rating: {rating}">{stars_html}</div>
+                    <div class="movie-genres-container">{genre_html}</div>
                 </div>
             </li>
             """
@@ -427,10 +459,17 @@ def generate_website_view():
     movie_grid = "\n".join(movie_grid_parts)
 
     # Replace placeholders
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    api_key = os.getenv("API_KEY", "")
+
     final_html = template.replace(
         "__TEMPLATE_TITLE__", "My Movie Collection"
     ).replace(
         "__TEMPLATE_MOVIE_GRID__", movie_grid
+    ).replace(
+        "__OMDB_API_KEY__", api_key
     )
 
     # Write final file
@@ -439,6 +478,7 @@ def generate_website_view():
 
     print("Website was generated successfully.")
     input(CONTINUE_MESSAGE)
+
 
 def switch_user_view():
     """Allow user to select or create profile."""
@@ -491,12 +531,11 @@ def switch_user_view():
 
     input(CONTINUE_MESSAGE)
 
+
 def exit_view():
     """Exit the application."""
     print("Bye!")
     sys.exit()
-
-
 
 
 view = {

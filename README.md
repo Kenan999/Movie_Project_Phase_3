@@ -8,7 +8,8 @@ The primary purpose is to keep an organized, locally accessible offline rating s
 ## Setup
 1. Ensure your API keys are stored in a local `.env` file (e.g. `API_KEY=...`)
 2. Install dependencies via `pip install -r requirements.txt`
-3. Everything is automatically configured!
+3. Run `python add_movies.py` to automatically add a curated selection of 40 movies to your database for testing out all the new features!
+4. Everything is automatically configured!
 
 ## Usage
 Launch the application with `python movies.py` and use the interactive numeric UI prompts.
@@ -18,3 +19,5 @@ Launch the application with `python movies.py` and use the interactive numeric U
 - Display statistics (averages, best/worst film).
 - Plot and save a rating histogram to your drive.
 - Instantly export your collection into a graphical HTML website!
+
+

@@ -31,12 +31,20 @@ with engine.connect() as connection:
             imdb_id TEXT,
             country TEXT,
             note TEXT DEFAULT '',
+            genre TEXT DEFAULT '',
             user_id INTEGER NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(id)
                 ON DELETE CASCADE,
             UNIQUE(title, user_id)
         )
     """))
+
+    # Add genre column to existing DB if missing
+    columns = connection.execute(text("PRAGMA table_info(movies)")).fetchall()
+    column_names = [col[1] for col in columns]
+    if "genre" not in column_names:
+        connection.execute(
+            text("ALTER TABLE movies ADD COLUMN genre TEXT DEFAULT ''"))
 
     connection.commit()
 
@@ -104,7 +112,8 @@ def fetch_movie_from_api(title):
             if data["imdbRating"] != "N/A" else 0.0,
             "poster": data["Poster"],
             "imdb_id": data.get("imdbID", ""),
-            "country": data.get("Country", "")
+            "country": data.get("Country", ""),
+            "genre": data.get("Genre", "")
         }
 
     except requests.RequestException as exc:
@@ -115,7 +124,7 @@ def list_movies():
     with engine.connect() as connection:
         result = connection.execute(
             text("""
-                SELECT title, year, rating, poster, imdb_id, country, note
+                SELECT title, year, rating, poster, imdb_id, country, note, genre
                 FROM movies
                 WHERE user_id = :user_id
             """),
@@ -130,7 +139,8 @@ def list_movies():
             "poster": row[3],
             "imdb_id": row[4],
             "country": row[5],
-            "note": row[6]
+            "note": row[6],
+            "genre": row[7] if row[7] is not None else ""
         }
         for row in rows
     }
@@ -149,8 +159,8 @@ def add_movie(title, note=""):
             connection.execute(
                 text("""
                     INSERT INTO movies
-                    (title, year, rating, poster, imdb_id, country, note, user_id)
-                    VALUES (:title, :year, :rating, :poster, :imdb_id, :country, :note, :user_id)
+                    (title, year, rating, poster, imdb_id, country, note, genre, user_id)
+                    VALUES (:title, :year, :rating, :poster, :imdb_id, :country, :note, :genre, :user_id)
                 """),
                 {
                     "title": movie["title"],
@@ -160,6 +170,7 @@ def add_movie(title, note=""):
                     "imdb_id": movie["imdb_id"],
                     "country": movie["country"],
                     "note": note.strip(),
+                    "genre": movie.get("genre", ""),
                     "user_id": current_user_id,
                 }
             )
